@@ -107,7 +107,7 @@ def run():
       merged_config = recursive_merge(merged_config, velociraptor_server_pillar["config"])
 
     client_config = {}
-    for key in ["version", "Client"]:
+    for key in ["Client"]:
       client_config[key] = merged_config[key]
 
     server_content = config_header
