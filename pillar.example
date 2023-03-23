@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 # vim: ft=yaml
 ---
+# the client code can use the settings from a salt mine if you set this up
+mine_functions:
+  velociraptor_client_settings:
+    - mine_function: grains.get
+    - velociraptor
+
 # both chunks are recursively merged into the configuration file so you can set any setting you want
 velociraptor:
   client:
