@@ -82,6 +82,10 @@ def run():
       ]
     }
 
+    #
+    # TODO: this is a bit tricky as generating the config is done before apparmor
+    #       but on the other hand we do not want write access in the apparmor profile
+    #
     # only run this once so we do not regenerate the config over and over.
     # the certificates are also on the clients
     if not(parsed_config and "Client" in parsed_config and "ca_certificate" in parsed_config["Client"]):
