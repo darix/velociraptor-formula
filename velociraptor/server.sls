@@ -128,7 +128,7 @@ def run():
 
     if use_apparmor:
       config["ensure_apparmor_is_running"] = {
-        "service.running" = [
+        "service.running": [
           { 'name':  'apparmor.service' },
           { 'enable': True },
           { 'require': [ 'velociraptor_packages' ] },
@@ -137,7 +137,7 @@ def run():
 
       if server_self_monitor:
         config["ensure_client_apparmor_profile_is_loaded"] = {
-          "cmd.run" = [
+          "cmd.run": [
             { "name":  f"/sbin/apparmor_parser -r -T -W /etc/apparmor.d/velociraptor-client-{apparmor_profile} &> /dev/null || :" },
             { 'require': [ 'velociraptor_packages' ] },
             { 'watch': [ 'velociraptor_packages' ] },
@@ -146,7 +146,7 @@ def run():
         }
 
       config["ensure_server_apparmor_profile_is_loaded"] = {
-        "cmd.run" = [
+        "cmd.run": [
           { "name":  f"/sbin/apparmor_parser -r -T -W /etc/apparmor.d/velociraptor-server &> /dev/null || :" },
           { 'require': [ 'velociraptor_packages' ] },
           { 'watch': [ 'velociraptor_packages' ] },
