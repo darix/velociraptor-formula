@@ -1,0 +1,17 @@
+# -*- coding: utf-8 -*-
+# vim: ft=yaml
+---
+# both chunks are recursively merged into the configuration file so you can set any setting you want
+velociraptor:
+  client:
+    config:
+      Client:
+        server_urls:
+          - https://velociraptor.example.com:8000/
+  server:
+    config:
+      Frontend:
+        bind_address: 127.0.0.1
+        tls_certificate_filename: /etc/ssl/services/velociraptor.example.com.with.chain.pem.ecdsa
+        tls_private_key_filename: /etc/ssl/services/velociraptor.example.com.with.chain.pem.ecdsa
+        proxy_header: X-Forwarded-For
