@@ -9,7 +9,13 @@ mine_functions:
 
 # both chunks are recursively merged into the configuration file so you can set any setting you want
 velociraptor:
+  # disabled by default
+  use_apparmor: False
+  # used for accessing salt mine
+  server_address: velociraptor.example.com
   client:
+    # default profile, can be set to restricted
+    apparmor_profile: unrestricted
     config:
       Client:
         server_urls:
