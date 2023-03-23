@@ -2,6 +2,7 @@
 
 import yaml
 import logging
+import os.path
 
 config_header = """#
 # documentation is at https://docs.velociraptor.app/docs/deployment/references/
@@ -58,8 +59,9 @@ def run():
     velociraptor_server = __pillar__["velociraptor"]["server_address"]
 
     parsed_config = {}
-    with open(velociraptor_client_config) as yaml_file:
-      parsed_config = yaml.load(yaml_file.read(), Loader=yaml.Loader)
+    if os.path.exist(velociraptor_client_config):
+      with open(velociraptor_client_config) as yaml_file:
+        parsed_config = yaml.load(yaml_file.read(), Loader=yaml.Loader)
 
     package_list = ['velociraptor-client']
 
