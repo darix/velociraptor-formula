@@ -173,6 +173,20 @@ def run():
           { "onchanges": ["velociraptor_client_config"]},
         ]
       }
+    else:
+      config["velociraptor_client_config"] = {
+        "file.absent": [
+          { "name":  velociraptor_client_config },
+        ]
+      }
+
+      config["velociraptor_client_service"] = {
+        "service.dead": [
+          { "name":    "velociraptor-client.service" },
+          { "enable":  "False" },
+          { "require": ["velociraptor_client_config"]},
+        ]
+      }
 
     config["velociraptor_server_service"] = {
       "service.running": [
