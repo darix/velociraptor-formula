@@ -10,9 +10,6 @@ config_header = """#
 log = logging.getLogger(__name__)
 
 def recursive_merge(current_config, new_config):
-  log.error(f"current_config: {current_config}")
-  log.error(f"new_config: {new_config}")
-
   merged_config = current_config.copy()
   for top_key, top_value in new_config.items():
     if type(top_value) == dict:
