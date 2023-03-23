@@ -13,6 +13,7 @@ velociraptor:
   use_apparmor: False
   # used for accessing salt mine
   server_address: velociraptor.example.com
+  server_self_monitor: True
   client:
     # default profile, can be set to restricted
     apparmor_profile: unrestricted

@@ -52,7 +52,8 @@ def run():
     velociraptor_server_pillar = __pillar__["velociraptor"]["server"]
     velociraptor_client_pillar = __pillar__["velociraptor"]["client"]
 
-    use_apparmor = __pillar__["velociraptor"].get('use_apparmor', False)
+    use_apparmor        = __pillar__["velociraptor"].get('use_apparmor', False)
+    server_self_monitor = __pillar__["velociraptor"].get('server_self_monitor', False)
     use_humio    = ( "humio_gateway" in velociraptor_client_pillar and velociraptor_client_pillar["humio_gateway"] )
 
     parsed_config = {}
@@ -67,12 +68,13 @@ def run():
     if use_apparmor:
       package_list.append("velociraptor-apparmor-server")
 
-      if "apparmor_profile" in velociraptor_client_pillar:
-        apparmor_profile = velociraptor_client_pillar["apparmor_profile"]
-        if apparmor_profile == "restricted":
-          package_list.append("velociraptor-apparmor-client-restricted")
-        else:
-          package_list.append("velociraptor-apparmor-client-unrestricted")
+      if server_self_monitor:
+        if "apparmor_profile" in velociraptor_client_pillar:
+          apparmor_profile = velociraptor_client_pillar["apparmor_profile"]
+          if apparmor_profile == "restricted":
+            package_list.append("velociraptor-apparmor-client-restricted")
+          else:
+            package_list.append("velociraptor-apparmor-client-unrestricted")
       if use_humio:
         package_list.append('velociraptor-apparmor-kafka-humio-gateway')
 
@@ -133,14 +135,15 @@ def run():
         ]
       }
 
-      config["ensure_client_apparmor_profile_is_loaded"] = {
-        "cmd.run" = [
-          { "name":  f"/sbin/apparmor_parser -r -T -W /etc/apparmor.d/velociraptor-client-{apparmor_profile} &> /dev/null || :" },
-          { 'require': [ 'velociraptor_packages' ] },
-          { 'watch': [ 'velociraptor_packages' ] },
-          { 'onchanges': [ 'velociraptor_packages' ] },
-        ]
-      }
+      if server_self_monitor:
+        config["ensure_client_apparmor_profile_is_loaded"] = {
+          "cmd.run" = [
+            { "name":  f"/sbin/apparmor_parser -r -T -W /etc/apparmor.d/velociraptor-client-{apparmor_profile} &> /dev/null || :" },
+            { 'require': [ 'velociraptor_packages' ] },
+            { 'watch': [ 'velociraptor_packages' ] },
+            { 'onchanges': [ 'velociraptor_packages' ] },
+          ]
+        }
 
       config["ensure_server_apparmor_profile_is_loaded"] = {
         "cmd.run" = [
@@ -151,24 +154,25 @@ def run():
         ]
       }
 
-    config["velociraptor_client_config"] = {
-      "file.managed": [
-        { "name":  velociraptor_client_config },
-        { "user": "root" },
-        { "group": "velociraptor" },
-        { "mode":  "0640" },
-        { "contents": client_content },
-      ]
-    }
+    if server_self_monitor:
+      config["velociraptor_client_config"] = {
+        "file.managed": [
+          { "name":  velociraptor_client_config },
+          { "user": "root" },
+          { "group": "velociraptor" },
+          { "mode":  "0640" },
+          { "contents": client_content },
+        ]
+      }
 
-    config["velociraptor_client_service"] = {
-      "service.running": [
-        { "name":    "velociraptor-client.service" },
-        { "enable":  "True" },
-        { "require": ["velociraptor_client_config"]},
-        { "onchanges": ["velociraptor_client_config"]},
-      ]
-    }
+      config["velociraptor_client_service"] = {
+        "service.running": [
+          { "name":    "velociraptor-client.service" },
+          { "enable":  "True" },
+          { "require": ["velociraptor_client_config"]},
+          { "onchanges": ["velociraptor_client_config"]},
+        ]
+      }
 
     config["velociraptor_server_service"] = {
       "service.running": [
