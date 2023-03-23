@@ -73,8 +73,13 @@ def run():
           apparmor_profile = velociraptor_client_pillar["apparmor_profile"]
           if apparmor_profile == "restricted":
             package_list.append("velociraptor-apparmor-client-restricted")
-          else:
+          elif apparmor_profile == "unrestricted":
             package_list.append("velociraptor-apparmor-client-unrestricted")
+          else:
+            log.error(f"Dont know how to handle apparmor profile: {apparmor_profile}. Falling back to unrestricted")
+            apparmor_profile = "unrestricted"
+            package_list.append("velociraptor-apparmor-client-unrestricted")
+
       if use_humio:
         package_list.append('velociraptor-apparmor-kafka-humio-gateway')
 
