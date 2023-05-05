@@ -19,7 +19,7 @@ def recursive_merge(current_config, new_config):
         try:
           merged_config[top_key][key] = value
         except KeyError:
-          merged_config[top_key] = Dict()
+          merged_config[top_key] = dict()
           merged_config[top_key][key] = value
     else:
       merged_config[top_key] = top_value
