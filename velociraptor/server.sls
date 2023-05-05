@@ -2,6 +2,7 @@
 
 import yaml
 import logging
+import os
 
 config_header = """#
 # documentation is at https://docs.velociraptor.app/docs/deployment/references/
@@ -57,8 +58,9 @@ def run():
     use_humio    = ( "humio_gateway" in velociraptor_client_pillar and velociraptor_client_pillar["humio_gateway"] )
 
     parsed_config = {}
-    with open(velociraptor_server_config) as yaml_file:
-      parsed_config = yaml.load(yaml_file.read(), Loader=yaml.Loader)
+    if os.path.exists(velociraptor_server_config):
+      with open(velociraptor_server_config) as yaml_file:
+        parsed_config = yaml.load(yaml_file.read(), Loader=yaml.Loader)
 
     package_list = ['velociraptor']
 
