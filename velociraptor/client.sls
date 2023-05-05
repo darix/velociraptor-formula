@@ -59,7 +59,7 @@ def run():
     velociraptor_server = __pillar__["velociraptor"]["server_address"]
 
     parsed_config = {}
-    if os.path.exist(velociraptor_client_config):
+    if os.path.exists(velociraptor_client_config):
       with open(velociraptor_client_config) as yaml_file:
         parsed_config = yaml.load(yaml_file.read(), Loader=yaml.Loader)
 
