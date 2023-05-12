@@ -75,6 +75,7 @@ def run():
       package_list.append("velociraptor-apparmor-server")
 
       if server_self_monitor:
+        package_list.append("velociraptor-client")
         if "apparmor_profile" in velociraptor_client_pillar:
           apparmor_profile = velociraptor_client_pillar["apparmor_profile"]
           if apparmor_profile == "restricted":
