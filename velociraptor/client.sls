@@ -26,6 +26,8 @@ def recursive_merge(current_config, new_config):
 def run():
   config = {}
 
+  apparmor_profile = "restricted"
+
   client_defaults = {
     "Client" : {
       "darwin_installer": {
@@ -69,10 +71,10 @@ def run():
 
     if use_apparmor:
       if "apparmor_profile" in velociraptor_client_pillar:
-        if velociraptor_client_pillar["apparmor_profile"]:
-          package_list.append("velociraptor-apparmor-client-restricted")
-        else:
-          package_list.append("velociraptor-apparmor-client-unrestricted")
+        apparmor_profile = velociraptor_client_pillar["apparmor_profile"]
+      else:
+        apparmor_profile = "unrestricted"
+      package_list.append(f"velociraptor-apparmor-client-{apparmor_profile}")
 
     config["velociraptor_packages"] = {
       "pkg.installed": [
