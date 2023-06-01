@@ -166,6 +166,15 @@ def run():
         ]
       }
 
+    config["velociraptor_server_service"] = {
+      "service.running": [
+        { "name":    "velociraptor.service" },
+        { "enable":  "True" },
+        { "require": ["velociraptor_merge_settings"] },
+        { "onchanges": ["velociraptor_merge_settings"] },
+      ]
+    }
+
     if server_self_monitor:
       config["velociraptor_client_config"] = {
         "file.managed": [
@@ -181,7 +190,7 @@ def run():
         "service.running": [
           { "name":    "velociraptor-client.service" },
           { "enable":  "True" },
-          { "require": ["velociraptor_client_config"]},
+          { "require": ["velociraptor_client_config", "velociraptor_server_service"]},
           { "onchanges": ["velociraptor_client_config"]},
         ]
       }
@@ -200,13 +209,5 @@ def run():
         ]
       }
 
-    config["velociraptor_server_service"] = {
-      "service.running": [
-        { "name":    "velociraptor.service" },
-        { "enable":  "True" },
-        { "require": ["velociraptor_merge_settings"] },
-        { "onchanges": ["velociraptor_merge_settings"] },
-      ]
-    }
 
   return config
