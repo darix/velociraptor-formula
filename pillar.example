@@ -14,6 +14,7 @@ velociraptor:
   # used for accessing salt mine
   server_address: velociraptor.example.com
   server_self_monitor: True
+  ca_certificate: /usr/share/pki/trust/anchors/filename.pem
   client:
     # default profile, can be set to restricted
     apparmor_profile: unrestricted

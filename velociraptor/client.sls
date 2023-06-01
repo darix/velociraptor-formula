@@ -64,6 +64,13 @@ def run():
     use_apparmor = __pillar__["velociraptor"].get('use_apparmor', False)
     velociraptor_server = __pillar__["velociraptor"]["server_address"]
 
+    ca_certificate_path = __pillar__["velociraptor"].get('ca_certificate', None)
+
+    if ca_certificate_path:
+      with open(ca_certificate_path) as ca_certificate_fd:
+        client_defaults["Crypto"] = {}
+        client_defaults["Crypto"]["root_certs"] = ca_certificate_fd.read()
+
     parsed_config = {}
     if os.path.exists(velociraptor_client_config):
       with open(velociraptor_client_config) as yaml_file:
