@@ -15,9 +15,11 @@ def recursive_merge(current_config, new_config):
   for top_key, top_value in new_config.items():
     if type(top_value) == dict:
       for key, value in top_value.items():
-        if not(top_key in merged_config):
-          merged_config[top_key] = {}
-        merged_config[top_key][key] = value
+        try:
+          merged_config[top_key][key] = value
+        except KeyError:
+          merged_config[top_key] = dict()
+          merged_config[top_key][key] = value
     else:
       merged_config[top_key] = top_value
 
