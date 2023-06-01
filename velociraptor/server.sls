@@ -122,6 +122,13 @@ def run():
     for key in ["Client"]:
       client_config[key] = merged_config[key]
 
+    ca_certificate_path = __pillar__["velociraptor"].get('ca_certificate', None)
+
+    if ca_certificate_path:
+      with open(ca_certificate_path) as ca_certificate_fd:
+        client_config["Client"]["Crypto"] = {}
+        client_config["Client"]["Crypto"]["root_certs"] = ca_certificate_fd.read()
+
     server_content = config_header
     server_content += yaml.dump(merged_config)
 
