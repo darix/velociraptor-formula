@@ -144,6 +144,7 @@ def run():
         { "name":    "velociraptor-client.service" },
         { "enable":  "True" },
         { "require": ["velociraptor_client_config"]},
+        { "watch": ["velociraptor_client_config"]},
         { "onchanges": ["velociraptor_client_config"]},
       ]
     }

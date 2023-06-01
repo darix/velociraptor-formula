@@ -179,6 +179,8 @@ def run():
         { "enable":  "True" },
         { "require": ["velociraptor_merge_settings"] },
         { "onchanges": ["velociraptor_merge_settings"] },
+        { "watch": ["velociraptor_merge_settings"]},
+
       ]
     }
 
@@ -199,6 +201,7 @@ def run():
           { "enable":  "True" },
           { "require": ["velociraptor_client_config", "velociraptor_server_service"]},
           { "onchanges": ["velociraptor_client_config"]},
+          { "watch": ["velociraptor_client_config"]},
         ]
       }
     else:
