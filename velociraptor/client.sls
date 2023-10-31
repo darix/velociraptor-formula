@@ -114,7 +114,7 @@ def run():
       "file.managed": [
         { "name":  velociraptor_client_config },
         { "user": "root" },
-        { "group": "velociraptor" },
+        { "group": "root" },
         { "mode":  "0640" },
         { "contents": client_content },
         { "require": ["velociraptor_packages"] }
