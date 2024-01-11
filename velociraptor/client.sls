@@ -3,7 +3,7 @@
 import yaml
 import logging
 import os.path
-import random
+import os
 import base64
 
 config_header = """#
@@ -111,7 +111,7 @@ def run():
       merged_config = recursive_merge(merged_config, velociraptor_client_pillar["config"])
 
     if not("nonce" in merged_config["Client"]):
-       merged_config["Client"]["nonce"] = base64.b64encode(random.randbytes(8))
+       merged_config["Client"]["nonce"] = base64.b64encode(os.urandom(8))
 
     client_content = config_header
     client_content += yaml.dump(merged_config)
