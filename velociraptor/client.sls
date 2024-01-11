@@ -3,6 +3,8 @@
 import yaml
 import logging
 import os.path
+import random
+import base64
 
 config_header = """#
 # documentation is at https://docs.velociraptor.app/docs/deployment/references/
@@ -70,6 +72,9 @@ def run():
       with open(ca_certificate_path) as ca_certificate_fd:
         client_defaults["Client"]["Crypto"] = {}
         client_defaults["Client"]["Crypto"]["root_certs"] = ca_certificate_fd.read()
+        client_defaults["Client"]["ca_certificate"] = ca_certificate_fd.read()
+
+    client_defaults["Client"]["nonce"] = base64.b64encode(random.randbytes(8))
 
     parsed_config = {}
     if os.path.exists(velociraptor_client_config):
