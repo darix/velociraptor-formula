@@ -71,8 +71,9 @@ def run():
     if ca_certificate_path:
       with open(ca_certificate_path) as ca_certificate_fd:
         client_defaults["Client"]["Crypto"] = {}
-        client_defaults["Client"]["Crypto"]["root_certs"] = ca_certificate_fd.read()
-        client_defaults["Client"]["ca_certificate"] = ca_certificate_fd.read()
+        ca_certificate_content = ca_certificate_fd.read()
+        client_defaults["Client"]["Crypto"]["root_certs"] = ca_certificate_content
+        client_defaults["Client"]["ca_certificate"] = ca_certificate_content
 
     parsed_config = {}
     if os.path.exists(velociraptor_client_config):
