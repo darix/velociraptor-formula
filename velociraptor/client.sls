@@ -74,8 +74,6 @@ def run():
         client_defaults["Client"]["Crypto"]["root_certs"] = ca_certificate_fd.read()
         client_defaults["Client"]["ca_certificate"] = ca_certificate_fd.read()
 
-    client_defaults["Client"]["nonce"] = base64.b64encode(random.randbytes(8))
-
     parsed_config = {}
     if os.path.exists(velociraptor_client_config):
       with open(velociraptor_client_config) as yaml_file:
@@ -111,6 +109,9 @@ def run():
 
     if "config" in velociraptor_client_pillar:
       merged_config = recursive_merge(merged_config, velociraptor_client_pillar["config"])
+
+    if not("nonce" in merged_config["Client"]):
+       merged_config["Client"]["nonce"] = base64.b64encode(random.randbytes(8))
 
     client_content = config_header
     client_content += yaml.dump(merged_config)
