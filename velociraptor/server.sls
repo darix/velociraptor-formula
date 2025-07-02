@@ -44,9 +44,9 @@ def recursive_merge(current_config, new_config):
 
   return merged_config
 
-def clean_config_settings(current_config, delete_keys=[])
-
-  for key in delete_keys:
+#def clean_config_settings(current_config, delete_keys=[])
+#
+#  for key in delete_keys:
 
 
 
