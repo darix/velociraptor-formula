@@ -21,6 +21,8 @@
 import yaml
 import logging
 import os
+from subprocess import PIPE, Popen
+from salt.exceptions import SaltConfigurationError
 
 config_header = """#
 # documentation is at https://docs.velociraptor.app/docs/deployment/references/
@@ -49,6 +51,29 @@ def recursive_merge(current_config, new_config):
 #  for key in delete_keys:
 
 
+#
+# TODO: this is a bit tricky as generating the config is done before apparmor
+#       but on the other hand we do not want write access in the apparmor profile
+#
+# only run this once so we do not regenerate the config over and over.
+# the certificates are also on the clients
+def generate_new_config():
+  env = os.environ.copy()
+  cmd = ["/usr/bin/velociraptor", "config", "generate", "--nobanner"]
+  try:
+      proc = Popen(cmd, stdout=PIPE, stderr=PIPE, env=env, encoding="utf-8")
+      config_data, config_error = proc.communicate()
+      config_returncode = proc.returncode
+  except (OSError, UnicodeDecodeError) as e:
+      config_data, config_error = "", str(e)
+      config_returncode = 1
+
+  # The version of pass used during development sent output to
+  # stdout instead of stderr even though its returncode was non zero.
+  if config_returncode or not config_data:
+      msg = f"Could not generate a new velociraptor config with {cmd}: rc:{config_returncode} {config_error}"
+      raise SaltConfigurationError(msg)
+  return config_data
 
 def run():
   config = {}
@@ -89,6 +114,9 @@ def run():
       with open(velociraptor_server_config) as yaml_file:
         parsed_config = yaml.load(yaml_file.read(), Loader=yaml.Loader)
 
+    if not(parsed_config and "Client" in parsed_config and "ca_certificate" in parsed_config["Client"]):
+      parsed_config= yaml.load(generate_new_config(), Loader=yaml.Loader)
+
     package_list = ['velociraptor']
 
     if use_humio:
@@ -118,19 +146,6 @@ def run():
         { "names": package_list },
       ]
     }
-
-    #
-    # TODO: this is a bit tricky as generating the config is done before apparmor
-    #       but on the other hand we do not want write access in the apparmor profile
-    #
-    # only run this once so we do not regenerate the config over and over.
-    # the certificates are also on the clients
-    if not(parsed_config and "Client" in parsed_config and "ca_certificate" in parsed_config["Client"]):
-      config["velociraptor_generate_config"] = {
-        "cmd.run": [
-          { "name":    f"/usr/bin/velociraptor config generate --nobanner > {velociraptor_server_config}" },
-        ]
-      }
 
     merged_config = recursive_merge(parsed_config, client_defaults)
     merged_config = recursive_merge(merged_config, server_defaults)
