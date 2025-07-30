@@ -49,3 +49,20 @@ velociraptor:
         tls_certificate_filename: /etc/ssl/services/velociraptor.example.com.with.chain.pem.ecdsa
         tls_private_key_filename: /etc/ssl/services/velociraptor.example.com.with.chain.pem.ecdsa
         proxy_header: X-Forwarded-For
+    users:
+      salt:
+        role: api_client
+        # optional settings
+        extra_permissions
+          - machine_state
+        effective_permissions
+          - all_query
+    artifacts:
+      server:
+        LinuxEvents:
+          option1: value1
+        LinuxExecutions:
+          option1: value1
+      client:
+        Foo: {}
+        Bar: {}
