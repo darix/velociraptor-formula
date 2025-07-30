@@ -260,5 +260,11 @@ def run():
         ]
       }
 
+    if "artifacts" in velociraptor_server_pillar:
+        config["velo_artifacts"]: {
+          "velo.artifacts_configured": [
+            {"require": ["velociraptor_server_service"] },
+          ]
+        }
 
   return config
