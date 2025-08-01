@@ -24,11 +24,11 @@ def get_velo_server_artifacts ():
         log.error("empty server artifacts")
         return {}
 
-def diff_srv_artifacts_params (current_params, desired_params):
+def diff_srv_artifacts_params (artifact, current_params, desired_params):
     ret = DiffStatus.ERROR
 
     if current_params is None:
-        log.error("server artifact {curr_art} params not found")
+        log.error("server artifact {artifact} params not found")
         return ret
     else:
         log.error(current_params)
@@ -38,11 +38,13 @@ def diff_srv_artifacts_params (current_params, desired_params):
             desired_value = next((value for key, value in desired_params.items() if key == current_key), None)
             
             if desired_value is None:
-                log.error(f"parameter {current_key} not found for server artifact")
+                log.error(f"parameter {current_key} not found for server artifact {artifact}")
                 return ret
             else:
-                if desired_value != current_value:
-                    log.info(f"{current_key} param desired {desired_value} != current {current_value}")
+                if current_key == "Artifacts":
+                    desired_value = 'Artifact\n' + '\n'.join(desired_value) + '\n'
+                if str(desired_value) != str(current_value):
+                    log.info(f"{artifact} - {current_key} param desired {desired_value} != current {current_value}")
                     return DiffStatus.DIFFERENT
                 else:
                     continue
@@ -54,7 +56,7 @@ def diff_srv_artifacts (current_artifacts, desired_artifacts):
     
     #Server.Monitor.Health
     #for pillar_art in pillar_artifacts:
-    ret = {'status': 1, 'toadd': [], 'todelete': [], 'toupdate': []}
+    ret = {'status': 1, 'toadd': [], 'todelete': [], 'toupdate': [], "toskip": []}
 
     desired_artifacts_only_name = list(desired_artifacts.keys())
 
@@ -69,15 +71,20 @@ def diff_srv_artifacts (current_artifacts, desired_artifacts):
             # check diffs in parameters
             current_params=next((item['parameters']['env'] for item in current_artifacts['specs'] if item['artifact'] == curr_art), None)
             desired_params=desired_artifacts[curr_art]
-            diff_ret = diff_srv_artifacts_params(current_params, desired_params)
+            diff_ret = diff_srv_artifacts_params(curr_art, current_params, desired_params)
             if diff_ret == DiffStatus.DIFFERENT:
                 log.info(f"{curr_art} will be updated")
                 ret['toupdate'].append(curr_art)
+            elif diff_ret == DiffStatus.EQUAL:
+                log.debug(f"{curr_art}: no update needed: artifact matches desired state.")
+                ret['toskip'].append(curr_art)
             else:
                 return ret
 
     for desired_artifact in desired_artifacts:
-        if desired_artifact not in ret['todelete'] and desired_artifact not in ret['toupdate']:
+        if (desired_artifact not in ret['todelete'] and 
+           desired_artifact not in ret['toupdate'] and
+           desired_artifact not in ret['toskip']):
             log.info(f"{desired_artifact} will be added")
             ret['toadd'].append(desired_artifact)
     
