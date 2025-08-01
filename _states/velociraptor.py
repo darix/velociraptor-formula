@@ -32,6 +32,31 @@ def get_velo_client_artifacts ():
         log.error("not able to retrieve client artifacts")
         return {}
 
+def add_velo_server_artifact (artifact, params):
+    query='SELECT add_server_monitoring(artifact="'
+    query += artifact + '", parameters=dict('
+    if params is not None:
+        if 'Artifacts' in params:
+          params['Artifacts'] = 'Artifact\n' + '\n'.join(params['Artifacts']) + '\n'
+
+        query += ', '.join(f'{key}="{value}"' for key, value in params.items())        
+    query += ')) FROM scope()'
+
+    #log.info(f"<<<<<< {query}")
+    out = run_velo_query(query)
+    log.info(out)
+    
+    if not out or 'None' in out:
+        log.error(f"error while adding {artifact}")
+        return 1
+    else:
+        return 0
+
+
+def apply_srv_artifacts (diff, artifacts):
+
+    for art in diff['toadd']:
+        add_velo_server_artifact(art, artifacts[art])
 
 def diff_artifacts_params (artifact, current_params, desired_params):
     ret = DiffStatus.ERROR
@@ -69,7 +94,7 @@ def diff_artifacts (current_artifacts, desired_artifacts):
 
     log.info(desired_artifacts_only_name)
     for curr_art in current_artifacts['artifacts']:
-        log.info(f">>>>>>>>>>>{curr_art}")
+        #log.info(f">>>>>>>>>>>{curr_art}")
         if curr_art in skip_artifacts:
             continue
         elif curr_art not in desired_artifacts:
@@ -113,38 +138,18 @@ def diff_artifacts (current_artifacts, desired_artifacts):
 def artifacts_configured(name):
     ret = {'name': name, 'result': None, 'changes': {}, 'comment': ""}
 
-    #log.info(current_srv_artifacts)
     log.error("R000000cks")
-    #ret['artifacts'] = artifacts
-    #vc = get_veloclient()
-
-    #artifacts = vc.get_artifacts()
 
     pillar_artifacts = __pillar__["velociraptor"]["server"]["artifacts"]
     log.info(pillar_artifacts)
 
     current_srv_artifacts = get_velo_server_artifacts()
-    diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
+    srv_diff = diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
+
+    apply_srv_artifacts(srv_diff, pillar_artifacts["server"])
 
     current_client_artifacts = get_velo_client_artifacts()
     diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
-  #delta = calculate_diff(artifacts, pillar_config)
-
-  #if delta == None:
-  #  ret["result"] = True
-  #  ret["comment"] = f"Artifacts configured correctly already"
-  #else:
-  #  if __opts__["test"]:
-  #    ret["comment"] = f"The following artifacts would be modified {delta}"
-  #    return ret
-  #  else:
-  #    if _verify_user_exists(name, ma):
-  #      ret["result"] = True
-  #      ret["changes"]["user"] = f"User '{name}' already created"
-  #    else:
-  #      ret["result"] = False
-  #      ret["comment"] = f"Something went wrong when trying to create user {name}"
-  #      return ret
 
     return ret
 
