@@ -44,7 +44,23 @@ def add_velo_server_artifact (artifact, params):
 
     #log.info(f"<<<<<< {query}")
     out = run_velo_query(query)
-    log.info(out)
+    #log.info(out)
+    
+    if not out or 'None' in out:
+        log.error(f"error while adding {artifact}")
+        return 1
+    else:
+        return 0
+
+def add_velo_client_artifact (artifact, params):
+    query = 'SELECT add_client_monitoring(artifact="'
+    query += artifact + '", parameters=dict('
+    if params is not None:
+        query += ', '.join(f'{key}="{value}"' for key, value in params.items())
+    query += ')) FROM scope()'
+
+    out = run_velo_query(query)
+    #log.info(out)
     
     if not out or 'None' in out:
         log.error(f"error while adding {artifact}")
@@ -53,10 +69,76 @@ def add_velo_server_artifact (artifact, params):
         return 0
 
 
-def apply_srv_artifacts (diff, artifacts):
+
+def del_velo_server_artifact (artifact):
+    query = 'SELECT rm_server_monitoring(artifact="'
+    query += artifact + '") FROM scope()'
+
+    out = run_velo_query(query)
+    #log.info(out)
+    
+    if not out or 'None' in out:
+        log.error(f"error while deleting {artifact}")
+        return 1
+    else:
+        return 0
+
+def del_velo_client_artifact (artifact):
+    query = 'SELECT rm_client_monitoring(artifact="'
+    query += artifact + '") FROM scope()'
+
+    out = run_velo_query(query)
+    #log.info(out)
+    
+    if not out or 'None' in out:
+        log.error(f"error while deleting {artifact}")
+        return 1
+    else:
+        return 0
+
+
+
+def apply_artifacts (is_srv, diff, artifacts):
+    ret = 1
+
+    if is_srv:
+        add_artifact='add_velo_server_artifact'
+        del_artifact='del_velo_server_artifact'
+    else:
+        add_artifact='add_velo_client_artifact'
+        del_artifact='del_velo_client_artifact'
+
 
     for art in diff['toadd']:
-        add_velo_server_artifact(art, artifacts[art])
+        if globals()[add_artifact](art, artifacts[art]):
+            log.error(f"unable to add artifact {art}")
+            return ret
+        else:
+            log.info(f"added artifact {art}")
+
+    for art in diff['toupdate']:
+        if globals()[del_artifact](art):
+            log.error(f"unable to delete artifact {art}")
+            return ret
+        else:
+            log.info(f"deleted artifact {art}")
+
+        if globals()[add_artifact](art, artifacts[art]):
+            log.error(f"unable to add artifact {art}")
+            return ret
+        else:
+            log.info(f"added artifact {art}")
+ 
+    for art in diff['todelete']:
+        if globals()[del_artifact](art):
+            log.error(f"unable to delete artifact {art}")
+            return ret
+        else:
+            log.info(f"deleted artifact {art}")
+
+   
+    ret = 0
+    return ret
 
 def diff_artifacts_params (artifact, current_params, desired_params):
     ret = DiffStatus.ERROR
@@ -92,10 +174,12 @@ def diff_artifacts (current_artifacts, desired_artifacts):
 
     desired_artifacts_only_name = list(desired_artifacts.keys())
 
-    log.info(desired_artifacts_only_name)
+    #log.info(desired_artifacts_only_name)
     for curr_art in current_artifacts['artifacts']:
         #log.info(f">>>>>>>>>>>{curr_art}")
         if curr_art in skip_artifacts:
+            log.info(f"{curr_art} will be skipped")
+            ret['toskip'].append(curr_art)
             continue
         elif curr_art not in desired_artifacts:
             log.info(f"{curr_art} will be deleted")
@@ -138,18 +222,21 @@ def diff_artifacts (current_artifacts, desired_artifacts):
 def artifacts_configured(name):
     ret = {'name': name, 'result': None, 'changes': {}, 'comment': ""}
 
-    log.error("R000000cks")
+    log.error("VRINIT")
 
     pillar_artifacts = __pillar__["velociraptor"]["server"]["artifacts"]
-    log.info(pillar_artifacts)
+    #log.info(pillar_artifacts)
 
     current_srv_artifacts = get_velo_server_artifacts()
     srv_diff = diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
 
-    apply_srv_artifacts(srv_diff, pillar_artifacts["server"])
+    apply_artifacts(True, srv_diff, pillar_artifacts["server"])
 
     current_client_artifacts = get_velo_client_artifacts()
-    diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
+    client_diff = diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
+
+
+    apply_artifacts(False, client_diff, pillar_artifacts["client"])
 
     return ret
 
