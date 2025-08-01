@@ -21,24 +21,33 @@ def get_velo_server_artifacts ():
     if len(out) > 0 and len(out[0]) > 0:
         return out[0][0]['get_server_monitoring()']
     else:
-        log.error("empty server artifacts")
+        log.error("not able to retrieve server artifacts")
         return {}
 
-def diff_srv_artifacts_params (artifact, current_params, desired_params):
+def get_velo_client_artifacts ():
+    out = run_velo_query('SELECT get_client_monitoring() FROM scope()')
+    if len(out) > 0 and len(out[0]) > 0:
+        return out[0][0]['get_client_monitoring()']['artifacts']
+    else:
+        log.error("not able to retrieve client artifacts")
+        return {}
+
+
+def diff_artifacts_params (artifact, current_params, desired_params):
     ret = DiffStatus.ERROR
 
     if current_params is None:
-        log.error("server artifact {artifact} params not found")
+        log.error("artifact {artifact} params not found")
         return ret
     else:
-        log.error(current_params)
+        #log.error(current_params)
         for current_param in current_params:
             current_key = current_param['key']
             current_value = current_param['value']
             desired_value = next((value for key, value in desired_params.items() if key == current_key), None)
             
             if desired_value is None:
-                log.error(f"parameter {current_key} not found for server artifact {artifact}")
+                log.error(f"parameter {current_key} not found for artifact {artifact}")
                 return ret
             else:
                 if current_key == "Artifacts":
@@ -51,35 +60,43 @@ def diff_srv_artifacts_params (artifact, current_params, desired_params):
 
     return DiffStatus.EQUAL
 
-def diff_srv_artifacts (current_artifacts, desired_artifacts):
-    skip_server_artifacts=['Server.Monitor.Health']
+def diff_artifacts (current_artifacts, desired_artifacts):
+    skip_artifacts=['Server.Monitor.Health', 'Generic.Client.Stats', 'Linux.Events.ProcessExecutions']
     
-    #Server.Monitor.Health
-    #for pillar_art in pillar_artifacts:
     ret = {'status': 1, 'toadd': [], 'todelete': [], 'toupdate': [], "toskip": []}
 
     desired_artifacts_only_name = list(desired_artifacts.keys())
 
     log.info(desired_artifacts_only_name)
     for curr_art in current_artifacts['artifacts']:
-        if curr_art in skip_server_artifacts:
+        log.info(f">>>>>>>>>>>{curr_art}")
+        if curr_art in skip_artifacts:
             continue
         elif curr_art not in desired_artifacts:
             log.info(f"{curr_art} will be deleted")
             ret['todelete'].append(curr_art)
         else:
             # check diffs in parameters
-            current_params=next((item['parameters']['env'] for item in current_artifacts['specs'] if item['artifact'] == curr_art), None)
-            desired_params=desired_artifacts[curr_art]
-            diff_ret = diff_srv_artifacts_params(curr_art, current_params, desired_params)
-            if diff_ret == DiffStatus.DIFFERENT:
-                log.info(f"{curr_art} will be updated")
-                ret['toupdate'].append(curr_art)
-            elif diff_ret == DiffStatus.EQUAL:
-                log.debug(f"{curr_art}: no update needed: artifact matches desired state.")
-                ret['toskip'].append(curr_art)
+            current_params=next((item['parameters'] for item in current_artifacts['specs'] if item['artifact'] == curr_art), None)
+            if current_params.get('env') is not None:
+                current_params=current_params['env']
             else:
-                return ret
+                current_params = None
+
+            if current_params is not None:
+                desired_params=desired_artifacts[curr_art]
+                diff_ret = diff_artifacts_params(curr_art, current_params, desired_params)
+                if diff_ret == DiffStatus.DIFFERENT:
+                    log.info(f"{curr_art} will be updated")
+                    ret['toupdate'].append(curr_art)
+                elif diff_ret == DiffStatus.EQUAL:
+                    log.debug(f"{curr_art}: no update needed: artifact matches desired state.")
+                    ret['toskip'].append(curr_art)
+                else:
+                    return ret
+            else:
+                log.debug(f"{curr_art}: no update needed (no params)")
+                ret['toskip'].append(curr_art)
 
     for desired_artifact in desired_artifacts:
         if (desired_artifact not in ret['todelete'] and 
@@ -96,8 +113,7 @@ def diff_srv_artifacts (current_artifacts, desired_artifacts):
 def artifacts_configured(name):
     ret = {'name': name, 'result': None, 'changes': {}, 'comment': ""}
 
-    current_srv_artifacts = get_velo_server_artifacts()
-    log.info(current_srv_artifacts)
+    #log.info(current_srv_artifacts)
     log.error("R000000cks")
     #ret['artifacts'] = artifacts
     #vc = get_veloclient()
@@ -107,7 +123,11 @@ def artifacts_configured(name):
     pillar_artifacts = __pillar__["velociraptor"]["server"]["artifacts"]
     log.info(pillar_artifacts)
 
-    diff_srv_artifacts(current_srv_artifacts, pillar_artifacts["server"])
+    current_srv_artifacts = get_velo_server_artifacts()
+    diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
+
+    current_client_artifacts = get_velo_client_artifacts()
+    diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
   #delta = calculate_diff(artifacts, pillar_config)
 
   #if delta == None:
