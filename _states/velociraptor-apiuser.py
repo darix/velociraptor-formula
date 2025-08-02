@@ -1,6 +1,9 @@
 import subprocess
 import json
 import logging
+import os
+import pwd
+import grp
 
 # todo: manage change in role
 # todo: manage change of username
@@ -14,7 +17,7 @@ def velocmd (server_config, cmd):
     result = subprocess.run(_cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True)
+        text=True)# user="velociraptor"
     return result
 
 def diff_grants(server_config, username, desired_grants):
@@ -59,7 +62,7 @@ def create_api_user (name, server_config, api_config):
 
     result = velocmd(server_config, ["user", "show", username])
     log.info(f"+++++{username} - {role} out {result.stdout} err {result.stderr}") 
-    if result.returncode == 0:
+    if result.returncode == 0 and os.path.exists(api_config):
          ret['result'] = True
          ret['comment'] = f"user {username} already created"    
          #diff grants
@@ -80,7 +83,13 @@ def create_api_user (name, server_config, api_config):
                      return ret
                  # update of grants is done later to avoid code redundacy
     else:
-         if "User not found" in result.stderr:
+         if "User not found" in result.stderr or not os.path.exists(api_config):
+            # clean user files just in case of wrong permissions
+            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
+                os.remove(user_settings["userspath"] + username + ".db")
+            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
+                os.remove(user_settings["aclpath"] + username + ".json.db")
+        
             log.info(f"user {username} not yet exist, creating ...")
             result = velocmd(server_config, ["config", "api_client", "--name", username, "--role", role, api_config])
 
@@ -111,9 +120,10 @@ def create_api_user (name, server_config, api_config):
         ret['result'] = True
         ret['changes'].update({"grants": grants})
 
+        #fix permissions
+        user_info = pwd.getpwnam(user_settings["fileowner"])
+        uid = user_info.pw_uid
+        gid = user_info.pw_gid
+        os.chown(user_settings["userspath"] + username + ".db", uid, gid)
+        os.chown(user_settings["aclpath"] + username + ".json.db", uid, gid)
     return ret
-
-#velociraptor --config /etc/velociraptor/server.config user show salt
-#velociraptor -v --config server.conf config api_client --name salt --role api api.conf
-#velociraptor -v --config server.conf acl grant salt {"collect_client":true,"collect_server":true}
-

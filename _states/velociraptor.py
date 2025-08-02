@@ -233,14 +233,18 @@ def artifacts_configured(name, _apiconfig):
 
     current_srv_artifacts = get_velo_server_artifacts()
     srv_diff = diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
-
     apply_artifacts(True, srv_diff, pillar_artifacts["server"])
+    if srv_diff["toadd"] or srv_diff["todelete"] or srv_diff["toupdate"]:
+        ret['changes'].update({"server_diff": {"added": srv_diff["toadd"], "deleted": srv_diff["todelete"], "updated": srv_diff["toupdate"]}})
 
     current_client_artifacts = get_velo_client_artifacts()
     client_diff = diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
-
-
     apply_artifacts(False, client_diff, pillar_artifacts["client"])
+    
+    if client_diff["toadd"] or client_diff["todelete"] or client_diff["toupdate"]:
+        ret['changes'].update({"client_diff": {"added": client_diff["toadd"], "deleted": client_diff["todelete"], "updated": client_diff["toupdate"]}})
+    
+    ret['result'] = True
 
     return ret
 
