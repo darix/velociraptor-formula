@@ -49,20 +49,38 @@ velociraptor:
         tls_certificate_filename: /etc/ssl/services/velociraptor.example.com.with.chain.pem.ecdsa
         tls_private_key_filename: /etc/ssl/services/velociraptor.example.com.with.chain.pem.ecdsa
         proxy_header: X-Forwarded-For
-    users:
+    user:
       salt:
-        role: api_client
-        # optional settings
-        extra_permissions
-          - machine_state
-        effective_permissions
-          - all_query
+        role: api
+        grants:
+          - any_query
+          - read_results
+          - collect_client
+          - collect_server
+      fileowner: "velociraptor"
+      userspath: "/var/lib/velociraptor/data/users/"
+      aclpath: "/var/lib/velociraptor/data/acl/"
     artifacts:
       server:
-        LinuxEvents:
-          option1: value1
-        LinuxExecutions:
-          option1: value1
+        LogScale.Events.Clients:
+          ingestApiBase: https://humio.test.com/api
+          ingestToken: token
+          tagFields: ClientId
+          numThreads: 1
+          httpTimeout: 10
+          batchingTimeoutMs: 30000
+          eventBatchSize: 2000
+          statsInterval: 600
+          Artifacts:
+            - Linux.Events.ProcessExecutions  
+        LogScale.Flows.Upload:
+          ingestApiBase: https://humio.test.com/api
+          ingestToken: token
+          tagFields: ClientId
+          numThreads: 1
+          httpTimeout: 10
+          batchingTimeoutMs: 30000
+          eventBatchSize: 2000
+          statsInterval: 600  
       client:
-        Foo: {}
-        Bar: {}
+        Linux.Events.ProcessExecutions:  {}
