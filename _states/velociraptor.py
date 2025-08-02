@@ -15,6 +15,7 @@ class DiffStatus(Enum):
 
 
 log = logging.getLogger(__name__)
+apiconfig = ""
 
 def get_velo_server_artifacts ():
     out = run_velo_query('SELECT get_server_monitoring() FROM scope()')
@@ -219,10 +220,13 @@ def diff_artifacts (current_artifacts, desired_artifacts):
     return ret     
 
 
-def artifacts_configured(name):
+def artifacts_configured(name, _apiconfig):
+    global apiconfig
     ret = {'name': name, 'result': None, 'changes': {}, 'comment': ""}
 
     log.error("VRINIT")
+
+    apiconfig = _apiconfig
 
     pillar_artifacts = __pillar__["velociraptor"]["server"]["artifacts"]
     #log.info(pillar_artifacts)
@@ -241,8 +245,8 @@ def artifacts_configured(name):
     return ret
 
 def run_velo_query (query, timeout=0):
-    configfile="/etc/salt/api.config.yaml"
-    config = pyvelociraptor.LoadConfigFile(configfile)
+    #configfile="/etc/salt/api.config.yaml"
+    config = pyvelociraptor.LoadConfigFile(apiconfig)
     ret = []
 
     creds = grpc.ssl_channel_credentials(
