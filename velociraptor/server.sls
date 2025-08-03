@@ -263,7 +263,7 @@ def run():
  
     if os.path.exists(velociraptor_server_config):
       config["velo_api_user"] = {
-        "velociraptor-apiuser.create_api_user": [
+        "velociraptor.create_api_user": [
             {"require": ["velociraptor_server_service"] },
             {"server_config": velociraptor_server_config},
             {"api_config": velociraptor_api_client_config}
@@ -273,7 +273,7 @@ def run():
     if "artifacts" in velociraptor_server_pillar:
         config["velo_artifacts"] = {
           "velociraptor.artifacts_configured": [
-            {"require": ["velociraptor_server_service"] },
+            {"require": ["velociraptor_server_service", "velo_api_user"] },
             {"_apiconfig": velociraptor_api_client_config},
           ]
         }

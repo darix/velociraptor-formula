@@ -7,14 +7,21 @@ import pyvelociraptor
 from pyvelociraptor import api_pb2
 from pyvelociraptor import api_pb2_grpc
 import logging
+import subprocess
+import os
+import pwd
+import grp
 
+log = logging.getLogger(__name__)
+
+#
+# ARTIFACTS CONFIGURATION
+#
 class DiffStatus(Enum):
     EQUAL = 0
     DIFFERENT = 1
     ERROR = 2
 
-
-log = logging.getLogger(__name__)
 apiconfig = ""
 
 def get_velo_server_artifacts ():
@@ -43,9 +50,7 @@ def add_velo_server_artifact (artifact, params):
         query += ', '.join(f'{key}="{value}"' for key, value in params.items())        
     query += ')) FROM scope()'
 
-    #log.info(f"<<<<<< {query}")
     out = run_velo_query(query)
-    #log.info(out)
     
     if not out or 'None' in out:
         log.error(f"error while adding {artifact}")
@@ -61,7 +66,6 @@ def add_velo_client_artifact (artifact, params):
     query += ')) FROM scope()'
 
     out = run_velo_query(query)
-    #log.info(out)
     
     if not out or 'None' in out:
         log.error(f"error while adding {artifact}")
@@ -76,7 +80,6 @@ def del_velo_server_artifact (artifact):
     query += artifact + '") FROM scope()'
 
     out = run_velo_query(query)
-    #log.info(out)
     
     if not out or 'None' in out:
         log.error(f"error while deleting {artifact}")
@@ -89,7 +92,6 @@ def del_velo_client_artifact (artifact):
     query += artifact + '") FROM scope()'
 
     out = run_velo_query(query)
-    #log.info(out)
     
     if not out or 'None' in out:
         log.error(f"error while deleting {artifact}")
@@ -148,7 +150,6 @@ def diff_artifacts_params (artifact, current_params, desired_params):
         log.error("artifact {artifact} params not found")
         return ret
     else:
-        #log.error(current_params)
         for current_param in current_params:
             current_key = current_param['key']
             current_value = current_param['value']
@@ -169,15 +170,13 @@ def diff_artifacts_params (artifact, current_params, desired_params):
     return DiffStatus.EQUAL
 
 def diff_artifacts (current_artifacts, desired_artifacts):
-    skip_artifacts=['Server.Monitor.Health', 'Generic.Client.Stats', 'Linux.Events.ProcessExecutions']
+    skip_artifacts=['Server.Monitor.Health', 'Generic.Client.Stats']
     
     ret = {'status': 1, 'toadd': [], 'todelete': [], 'toupdate': [], "toskip": []}
 
     desired_artifacts_only_name = list(desired_artifacts.keys())
 
-    #log.info(desired_artifacts_only_name)
     for curr_art in current_artifacts['artifacts']:
-        #log.info(f">>>>>>>>>>>{curr_art}")
         if curr_art in skip_artifacts:
             log.info(f"{curr_art} will be skipped")
             ret['toskip'].append(curr_art)
@@ -218,35 +217,6 @@ def diff_artifacts (current_artifacts, desired_artifacts):
     ret['status'] = 0
 
     return ret     
-
-
-def artifacts_configured(name, _apiconfig):
-    global apiconfig
-    ret = {'name': name, 'result': None, 'changes': {}, 'comment': ""}
-
-    log.error("VRINIT")
-
-    apiconfig = _apiconfig
-
-    pillar_artifacts = __pillar__["velociraptor"]["server"]["artifacts"]
-    #log.info(pillar_artifacts)
-
-    current_srv_artifacts = get_velo_server_artifacts()
-    srv_diff = diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
-    apply_artifacts(True, srv_diff, pillar_artifacts["server"])
-    if srv_diff["toadd"] or srv_diff["todelete"] or srv_diff["toupdate"]:
-        ret['changes'].update({"server_diff": {"added": srv_diff["toadd"], "deleted": srv_diff["todelete"], "updated": srv_diff["toupdate"]}})
-
-    current_client_artifacts = get_velo_client_artifacts()
-    client_diff = diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
-    apply_artifacts(False, client_diff, pillar_artifacts["client"])
-    
-    if client_diff["toadd"] or client_diff["todelete"] or client_diff["toupdate"]:
-        ret['changes'].update({"client_diff": {"added": client_diff["toadd"], "deleted": client_diff["todelete"], "updated": client_diff["toupdate"]}})
-    
-    ret['result'] = True
-
-    return ret
 
 def run_velo_query (query, timeout=0):
     #configfile="/etc/salt/api.config.yaml"
@@ -289,3 +259,157 @@ def run_velo_query (query, timeout=0):
 
     return ret
 
+def artifacts_configured(name, _apiconfig):
+    global apiconfig
+    ret = {'name': name, 'result': None, 'changes': {}, 'comment': ""}
+
+    log.debug("VR-ARTIFACTS")
+
+    apiconfig = _apiconfig
+
+    pillar_artifacts = __pillar__["velociraptor"]["server"]["artifacts"]
+    #log.info(pillar_artifacts)
+
+    current_srv_artifacts = get_velo_server_artifacts()
+    srv_diff = diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
+    apply_artifacts(True, srv_diff, pillar_artifacts["server"])
+    if srv_diff["toadd"] or srv_diff["todelete"] or srv_diff["toupdate"]:
+        ret['changes'].update({"server_diff": {"added": srv_diff["toadd"], "deleted": srv_diff["todelete"], "updated": srv_diff["toupdate"]}})
+
+    current_client_artifacts = get_velo_client_artifacts()
+    client_diff = diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
+    apply_artifacts(False, client_diff, pillar_artifacts["client"])
+    
+    if client_diff["toadd"] or client_diff["todelete"] or client_diff["toupdate"]:
+        ret['changes'].update({"client_diff": {"added": client_diff["toadd"], "deleted": client_diff["todelete"], "updated": client_diff["toupdate"]}})
+    
+    ret['result'] = True
+
+    return ret
+
+##
+## APICONFIG / USER CREATION
+## 
+
+def velocmd (server_config, cmd):
+    _cmd = ["velociraptor", "--config", server_config]
+    _cmd.extend(cmd)
+
+    log.debug(f"**** {_cmd}")
+    result = subprocess.run(_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        text=True)# user="velociraptor"
+    return result
+
+def diff_grants(server_config, username, desired_grants):
+    ret = {"error": True, "diff": False}
+
+    result = velocmd(server_config, ["acl", "show", username])
+    if result.returncode != 0:
+        log.error(f"error while retrieving user {username} grants")
+        return ret
+
+    try:
+        current_grants = json.loads(result.stdout)
+
+        ret["error"] = False
+        
+        for current_grant in current_grants.keys():
+            if current_grant not in desired_grants:
+                ret["diff"] = True
+                return ret
+
+        for desired_grant in desired_grants:
+            if desired_grant not in current_grants.keys():
+                ret["diff"] = True
+                return ret
+
+    except json.JSONDecodeError as e:
+        log.error("error parsing json:", e)
+        return ret
+
+
+    return ret
+
+def create_api_user (name, server_config, api_config):
+    # todo: manage change in role
+    # todo: manage change of username
+    
+    ret = {'name': name, 'result': None, 'changes': {}, 'comment': ""}
+    new_user = False
+    different_grants = False
+
+    log.debug("VR-APIUSER")
+
+    user_settings = __pillar__["velociraptor"]["server"]["user"]
+
+    username = next(iter(user_settings))
+    role = user_settings[username]['role']
+    grants = user_settings[username]['grants']
+
+    result = velocmd(server_config, ["user", "show", username])
+    if result.returncode == 0 and os.path.exists(api_config):
+         ret['result'] = True
+         ret['comment'] = f"user {username} already created"    
+         #diff grants
+         diff = diff_grants(server_config, username, grants)
+         if diff["error"]:
+             log.error(f"error while diffing grants")
+             return ret
+         else:
+             if diff["diff"]:
+                 different_grants = True
+
+                 # clean grants
+                 result = velocmd(server_config, ["acl", "grant", username, "{}"])
+                 if result.returncode != 0:
+                     log.error("error while cleaning grants")
+                     ret['result'] = False
+                     ret['comment'] = f"error while cleaning grants"    
+                     return ret
+                 # update of grants is done later to avoid code redundacy
+    else:
+         if "User not found" in result.stderr or not os.path.exists(api_config):
+            # clean user files just in case of wrong permissions
+            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
+                os.remove(user_settings["userspath"] + username + ".db")
+            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
+                os.remove(user_settings["aclpath"] + username + ".json.db")
+        
+            log.info(f"user {username} not yet exist, creating ...")
+            result = velocmd(server_config, ["config", "api_client", "--name", username, "--role", role, api_config])
+
+            if result.returncode != 0:
+                ret['result'] = False
+                ret['comment'] = f"error while creating user {username}"
+                return ret
+            
+            new_user = True
+            ret['changes'] = {username: f"user {username} properly created with role {role}"}
+            log.info(f"user {username} properly created ...")
+            
+    if new_user or different_grants:
+        # adapt to format required by velociraptor tool
+        grants = {key: True for key in grants}
+        grants = json.dumps(grants)
+
+        result = velocmd(server_config, ["acl", "grant", username, grants])
+            
+        if result.returncode != 0:
+            ret['result'] = False
+            ret['comment'] = f"error while adding {grants} to user {username}"
+            return ret
+
+        log.info(f"grants {grants} properly added")
+        ret['result'] = True
+        ret['changes'].update({"grants": grants})
+
+        #fix permissions
+        user_info = pwd.getpwnam(user_settings["fileowner"])
+        uid = user_info.pw_uid
+        gid = user_info.pw_gid
+        os.chown(user_settings["userspath"] + username + ".db", uid, gid)
+        os.chown(user_settings["aclpath"] + username + ".json.db", uid, gid)
+    return ret
