@@ -329,7 +329,13 @@ def diff_grants(server_config, username, desired_grants):
         current_grants = json.loads(result.stdout)
         ret["error"] = False
 
-        ret["current_grants"] = list(current_grants.keys())
+        # quirk: acl show returns {"roles":["api"]} with no grants
+        if "roles" in current_grants.keys():
+            ret["current_grants"] = []
+            ret["diff"] = True
+            return ret
+        else:
+            ret["current_grants"] = list(current_grants.keys())
 
         for current_grant in current_grants.keys():
             if current_grant not in desired_grants:
@@ -366,38 +372,42 @@ def create_api_user (name, server_config, api_config):
     result = velocmd(server_config, ["user", "show", username])
     if result.returncode == 0:
         ret['result'] = True
-        ret['comment'] = f"user {username} already created"   
+        ret['comment'] = f"user {username} already created; "   
         user_exists = True
     else:
         if "User not found" in result.stderr:
-            user_exists = False
+            user_exists = False            
 
-        if not user_exists:
-            ret['comment'] = f"user {username} does not exist, it will be created; "
-                
-        if not api_config_exists:
-            ret['comment'] += "apiconfig does not exists, it will be created; "
-                
-        if not user_exists or not api_config_exists:    
-            if not __opts__["test"]:
-                # clean user files just in case of wrong permissions
-                if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
-                    os.remove(user_settings["userspath"] + username + ".db")
-                if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
-                    os.remove(user_settings["aclpath"] + username + ".json.db")
+    if not user_exists or not api_config_exists:    
+        if not __opts__["test"]:
+            # clean user files just in case of wrong permissions
+            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
+                os.remove(user_settings["userspath"] + username + ".db")
+            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
+                os.remove(user_settings["aclpath"] + username + ".json.db")
         
-                log.info(f"user {username} not yet exist or apiconfig does not exists, creating ...")
-                result = velocmd(server_config, ["config", "api_client", "--name", username, "--role", role, api_config])
+            log.info(f"user {username} not yet exist or apiconfig does not exists, creating ...")
+            result = velocmd(server_config, ["config", "api_client", "--name", username, "--role", role, api_config])
 
-                if result.returncode != 0:
-                    ret['result'] = False
-                    ret['comment'] = f"error while creating user {username}"
-                    return ret
+            if result.returncode != 0:
+                ret['result'] = False
+                ret['comment'] = f"error while creating user {username}"
+                return ret
 
-                new_user = True
-                ret['changes'] = {username: f"user {username} properly created with role {role}"}
-                log.info(f"user {username} properly created ...")
+            new_user = True
+            ret['changes'] = {username: f"user {username} properly created with role {role}"}
+            log.info(f"user {username} properly created ...")
  
+    if not user_exists:
+        ret['comment'] = f"user {username} does not exist, it will be created; "
+        ret['changes']['add_user'] = True
+        log.info(f"user {username} does not exist, it will be created")
+
+    if not api_config_exists:
+        ret['comment'] += "apiconfig does not exists, it will be created; "
+        ret['changes']['add_apiconfig'] = True
+        log.info("apiconfig does not exists")
+
     if (new_user or not api_config_exists):
         diff = diff_grants(server_config, username, grants)
         if diff["error"]:
@@ -407,7 +417,8 @@ def create_api_user (name, server_config, api_config):
             if diff["diff"]:
                 different_grants = True
                 ret['comment'] += f"different user grants"
-                ret['changes'] = { "desired_grants": grants, "current_grants": diff["current_grants"]}
+                ret['changes']['desired_grants'] = grants
+                ret['changes']['current_grants'] = diff["current_grants"]
 
                 if not __opts__["test"]: 
                     # clean grants
