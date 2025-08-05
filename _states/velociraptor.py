@@ -1,7 +1,6 @@
 import json
 import grpc
 import time
-import yaml
 from enum import Enum
 import pyvelociraptor
 from pyvelociraptor import api_pb2
@@ -10,7 +9,6 @@ import logging
 import subprocess
 import os
 import pwd
-import grp
 
 log = logging.getLogger(__name__)
 
@@ -356,7 +354,7 @@ def create_api_user (name, server_config, api_config):
          #diff grants
          diff = diff_grants(server_config, username, grants)
          if diff["error"]:
-             log.error(f"error while diffing grants")
+             log.error("error while diffing grants")
              return ret
          else:
              if diff["diff"]:
@@ -367,7 +365,7 @@ def create_api_user (name, server_config, api_config):
                  if result.returncode != 0:
                      log.error("error while cleaning grants")
                      ret['result'] = False
-                     ret['comment'] = f"error while cleaning grants"
+                     ret['comment'] = "error while cleaning grants"
                      return ret
                  # update of grants is done later to avoid code redundacy
     else:
