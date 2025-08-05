@@ -11,6 +11,7 @@ import subprocess
 import os
 import pwd
 import grp
+from salt.exceptions import SaltConfigurationError
 
 log = logging.getLogger(__name__)
 
@@ -54,9 +55,9 @@ def add_velo_server_artifact (artifact, params):
     
     if not out or 'None' in out:
         log.error(f"error while adding {artifact}")
-        return 1
+        return False
     else:
-        return 0
+        return True
 
 def add_velo_client_artifact (artifact, params):
     query = 'SELECT add_client_monitoring(artifact="'
@@ -69,9 +70,9 @@ def add_velo_client_artifact (artifact, params):
     
     if not out or 'None' in out:
         log.error(f"error while adding {artifact}")
-        return 1
+        return False
     else:
-        return 0
+        return True
 
 
 
@@ -83,9 +84,9 @@ def del_velo_server_artifact (artifact):
     
     if not out or 'None' in out:
         log.error(f"error while deleting {artifact}")
-        return 1
+        return False
     else:
-        return 0
+        return True
 
 def del_velo_client_artifact (artifact):
     query = 'SELECT rm_client_monitoring(artifact="'
@@ -95,14 +96,14 @@ def del_velo_client_artifact (artifact):
     
     if not out or 'None' in out:
         log.error(f"error while deleting {artifact}")
-        return 1
+        return False
     else:
-        return 0
+        return True
 
 
 
 def apply_artifacts (is_srv, diff, artifacts):
-    ret = 1
+    ret = False
 
     if is_srv:
         add_artifact='add_velo_server_artifact'
@@ -113,34 +114,34 @@ def apply_artifacts (is_srv, diff, artifacts):
 
 
     for art in diff['toadd']:
-        if globals()[add_artifact](art, artifacts[art]):
+        if globals()[add_artifact](art, artifacts[art]) == False:
             log.error(f"unable to add artifact {art}")
             return ret
         else:
             log.info(f"added artifact {art}")
 
     for art in diff['toupdate']:
-        if globals()[del_artifact](art):
+        if globals()[del_artifact](art) == False:
             log.error(f"unable to delete artifact {art}")
             return ret
         else:
             log.info(f"deleted artifact {art}")
 
-        if globals()[add_artifact](art, artifacts[art]):
+        if globals()[add_artifact](art, artifacts[art]) == False:
             log.error(f"unable to add artifact {art}")
             return ret
         else:
             log.info(f"added artifact {art}")
  
     for art in diff['todelete']:
-        if globals()[del_artifact](art):
+        if globals()[del_artifact](art) == False:
             log.error(f"unable to delete artifact {art}")
             return ret
         else:
             log.info(f"deleted artifact {art}")
 
    
-    ret = 0
+    ret = True
     return ret
 
 def diff_artifacts_params (artifact, current_params, desired_params):
@@ -220,6 +221,9 @@ def diff_artifacts (current_artifacts, desired_artifacts):
 
 def run_velo_query (query, timeout=0):
     #configfile="/etc/salt/api.config.yaml"
+    if not os.path.exists(apiconfig):
+        raise SaltConfigurationError()
+
     config = pyvelociraptor.LoadConfigFile(apiconfig)
     ret = []
 
@@ -272,13 +276,24 @@ def artifacts_configured(name, _apiconfig):
 
     current_srv_artifacts = get_velo_server_artifacts()
     srv_diff = diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
-    apply_artifacts(True, srv_diff, pillar_artifacts["server"])
+
+    if not __opts__["test"]:
+        if apply_artifacts(True, srv_diff, pillar_artifacts["server"]) == False:
+            ret['result'] = False
+            ret['comment'] = "error while applying server artifacts"
+            return ret
+
     if srv_diff["toadd"] or srv_diff["todelete"] or srv_diff["toupdate"]:
         ret['changes'].update({"server_diff": {"added": srv_diff["toadd"], "deleted": srv_diff["todelete"], "updated": srv_diff["toupdate"]}})
 
     current_client_artifacts = get_velo_client_artifacts()
     client_diff = diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
-    apply_artifacts(False, client_diff, pillar_artifacts["client"])
+    
+    if not __opts__["test"]:
+        if apply_artifacts(False, client_diff, pillar_artifacts["client"]) == False:
+            ret['result'] = False
+            ret['comment'] = "error while applying client artifacts"
+            return ret
     
     if client_diff["toadd"] or client_diff["todelete"] or client_diff["toupdate"]:
         ret['changes'].update({"client_diff": {"added": client_diff["toadd"], "deleted": client_diff["todelete"], "updated": client_diff["toupdate"]}})
@@ -304,7 +319,7 @@ def velocmd (server_config, cmd):
     return result
 
 def diff_grants(server_config, username, desired_grants):
-    ret = {"error": True, "diff": False}
+    ret = {"error": True, "diff": False, "current_grants": []}
 
     result = velocmd(server_config, ["acl", "show", username])
     if result.returncode != 0:
@@ -313,8 +328,9 @@ def diff_grants(server_config, username, desired_grants):
 
     try:
         current_grants = json.loads(result.stdout)
-
         ret["error"] = False
+        
+        ret["current_grants"] = list(current_grants.keys())
         
         for current_grant in current_grants.keys():
             if current_grant not in desired_grants:
@@ -361,36 +377,42 @@ def create_api_user (name, server_config, api_config):
          else:
              if diff["diff"]:
                  different_grants = True
-
-                 # clean grants
-                 result = velocmd(server_config, ["acl", "grant", username, "{}"])
-                 if result.returncode != 0:
-                     log.error("error while cleaning grants")
-                     ret['result'] = False
-                     ret['comment'] = f"error while cleaning grants"    
-                     return ret
-                 # update of grants is done later to avoid code redundacy
+                 if __opts__["test"]:
+                    ret['comment'] += f", but different grants"
+                    ret['changes'] = { "desired_grants": grants, "current_grants": diff["current_grants"]}
+                 else: 
+                     # clean grants
+                     result = velocmd(server_config, ["acl", "grant", username, "{}"])
+                     if result.returncode != 0:
+                         log.error("error while cleaning grants")
+                         ret['result'] = False
+                         ret['comment'] = f"error while cleaning grants"    
+                         return ret
+                     # update of grants is done later to avoid code redundacy
     else:
          if "User not found" in result.stderr or not os.path.exists(api_config):
-            # clean user files just in case of wrong permissions
-            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
-                os.remove(user_settings["userspath"] + username + ".db")
-            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
-                os.remove(user_settings["aclpath"] + username + ".json.db")
+            if __opts__["test"]:
+                ret['comment'] = f"user {username} not yet exist, creating ..."
+            else:
+                # clean user files just in case of wrong permissions
+                if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
+                    os.remove(user_settings["userspath"] + username + ".db")
+                if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
+                    os.remove(user_settings["aclpath"] + username + ".json.db")
         
-            log.info(f"user {username} not yet exist, creating ...")
-            result = velocmd(server_config, ["config", "api_client", "--name", username, "--role", role, api_config])
+                log.info(f"user {username} not yet exist, creating ...")
+                result = velocmd(server_config, ["config", "api_client", "--name", username, "--role", role, api_config])
 
-            if result.returncode != 0:
-                ret['result'] = False
-                ret['comment'] = f"error while creating user {username}"
-                return ret
+                if result.returncode != 0:
+                    ret['result'] = False
+                    ret['comment'] = f"error while creating user {username}"
+                    return ret
             
-            new_user = True
-            ret['changes'] = {username: f"user {username} properly created with role {role}"}
-            log.info(f"user {username} properly created ...")
+                new_user = True
+                ret['changes'] = {username: f"user {username} properly created with role {role}"}
+                log.info(f"user {username} properly created ...")
             
-    if new_user or different_grants:
+    if (new_user or different_grants) and not __opts__["test"]:
         # adapt to format required by velociraptor tool
         grants = {key: True for key in grants}
         grants = json.dumps(grants)
