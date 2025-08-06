@@ -215,6 +215,14 @@ def run():
         ]
       }
 
+      config["ensure_cli_apparmor_profile_is_loaded"] = {
+        "cmd.run": [
+          { "name":  f"/sbin/apparmor_parser -r -T -W /etc/apparmor.d/velociraptor-cli &> /dev/null || :" },
+          { 'require': [ 'velociraptor_packages' ] },
+          { 'watch': [ 'velociraptor_packages' ] },
+          { 'onchanges': [ 'velociraptor_packages' ] },
+        ]
+      }
     for subdir in ['acl', 'clients', 'config', 'users']:
       config[f"velociraptor_ensure_data_subdir_{subdir}"] = {
         "file.directory": [
@@ -274,7 +282,7 @@ def run():
 
     config["velo_api_user"] = {
       "velociraptor.create_api_user": [
-          {"require": ["velociraptor_server_service"] },
+          {"require": ["velociraptor_server_service", "ensure_cli_apparmor_profile_is_loaded"] },
           {"server_config": velociraptor_server_config},
           {"api_config": velociraptor_api_client_config}
        ]
@@ -283,7 +291,7 @@ def run():
     if "artifacts" in velociraptor_server_pillar:
       config["velo_artifacts"] = {
         "velociraptor.artifacts_configured": [
-          {"require": ["velociraptor_server_service",  "velo_api_user"] },
+          {"require": ["velo_api_user"] },
           {"_apiconfig": velociraptor_api_client_config},
         ]
       }
