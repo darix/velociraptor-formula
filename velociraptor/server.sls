@@ -215,7 +215,7 @@ def run():
         ]
       }
 
-    for subdir in ['acls', 'clients', 'config', 'users']:
+    for subdir in ['acl', 'clients', 'config', 'users']:
       config[f"velociraptor_ensure_data_subdir_{subdir}"] = {
         "file.directory": [
           { "name":    f"/var/lib/velociraptor/data/{subdir}" },
