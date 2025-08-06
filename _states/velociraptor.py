@@ -267,35 +267,37 @@ def artifacts_configured(name, _apiconfig):
     pillar_artifacts = __pillar__["velociraptor"]["server"]["artifacts"]
     #log.info(pillar_artifacts)
 
-    current_srv_artifacts = get_velo_server_artifacts()
-    if current_srv_artifacts is None:
-        message = "not able to get velociraptor server artifacts"
-        raise SaltRenderError(message)
-    srv_diff = diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
+    if "server" in pillar_artifacts:
+        current_srv_artifacts = get_velo_server_artifacts()
+        if current_srv_artifacts is None:
+            message = "not able to get velociraptor server artifacts"
+            raise SaltRenderError(message)
+        srv_diff = diff_artifacts(current_srv_artifacts, pillar_artifacts["server"])
 
-    if not __opts__["test"]:
-        if apply_artifacts(True, srv_diff, pillar_artifacts["server"]) == False:
-            ret['result'] = False
-            ret['comment'] = "error while applying server artifacts"
-            return ret
+        if not __opts__["test"]:
+            if apply_artifacts(True, srv_diff, pillar_artifacts["server"]) == False:
+                ret['result'] = False
+                ret['comment'] = "error while applying server artifacts"
+                return ret
 
-    if srv_diff["toadd"] or srv_diff["todelete"] or srv_diff["toupdate"]:
-        ret['changes'].update({"server_diff": {"added": srv_diff["toadd"], "deleted": srv_diff["todelete"], "updated": srv_diff["toupdate"]}})
+        if srv_diff["toadd"] or srv_diff["todelete"] or srv_diff["toupdate"]:
+            ret['changes'].update({"server_diff": {"added": srv_diff["toadd"], "deleted": srv_diff["todelete"], "updated": srv_diff["toupdate"]}})
 
-    current_client_artifacts = get_velo_client_artifacts()
-    if current_client_artifacts is None:
-        message = "not able to get velociraptor client artifacts"
-        raise SaltRenderError(message)
-    client_diff = diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
+    if "client" in pillar_artifacts:
+        current_client_artifacts = get_velo_client_artifacts()
+        if current_client_artifacts is None:
+            message = "not able to get velociraptor client artifacts"
+            raise SaltRenderError(message)
+        client_diff = diff_artifacts(current_client_artifacts, pillar_artifacts["client"])
 
-    if not __opts__["test"]:
-        if apply_artifacts(False, client_diff, pillar_artifacts["client"]) == False:
-            ret['result'] = False
-            ret['comment'] = "error while applying client artifacts"
-            return ret
-    
-    if client_diff["toadd"] or client_diff["todelete"] or client_diff["toupdate"]:
-        ret['changes'].update({"client_diff": {"added": client_diff["toadd"], "deleted": client_diff["todelete"], "updated": client_diff["toupdate"]}})
+        if not __opts__["test"]:
+            if apply_artifacts(False, client_diff, pillar_artifacts["client"]) == False:
+                ret['result'] = False
+                ret['comment'] = "error while applying client artifacts"
+                return ret
+
+        if client_diff["toadd"] or client_diff["todelete"] or client_diff["toupdate"]:
+            ret['changes'].update({"client_diff": {"added": client_diff["toadd"], "deleted": client_diff["todelete"], "updated": client_diff["toupdate"]}})
 
     ret['result'] = True
 
@@ -368,24 +370,24 @@ def create_api_user (name, server_config, api_config):
     api_config_exists = os.path.exists(api_config)
     user_exists = False
     new_user = False
-    
+
     result = velocmd(server_config, ["user", "show", username])
     if result.returncode == 0:
         ret['result'] = True
-        ret['comment'] = f"user {username} already created; "   
+        ret['comment'] = f"user {username} already created; "
         user_exists = True
     else:
         if "User not found" in result.stderr:
-            user_exists = False            
+            user_exists = False
 
-    if not user_exists or not api_config_exists:    
+    if not user_exists or not api_config_exists:
         if not __opts__["test"]:
             # clean user files just in case of wrong permissions
             if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
                 os.remove(user_settings["userspath"] + username + ".db")
             if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
                 os.remove(user_settings["aclpath"] + username + ".json.db")
-        
+
             log.info(f"user {username} not yet exist or apiconfig does not exists, creating ...")
             result = velocmd(server_config, ["config", "api_client", "--name", username, "--role", role, api_config])
 
@@ -397,7 +399,7 @@ def create_api_user (name, server_config, api_config):
             new_user = True
             ret['changes'] = {username: f"user {username} properly created with role {role}"}
             log.info(f"user {username} properly created ...")
- 
+
     if not user_exists:
         ret['comment'] = f"user {username} does not exist, it will be created; "
         ret['changes']['add_user'] = True
@@ -420,13 +422,13 @@ def create_api_user (name, server_config, api_config):
                 ret['changes']['desired_grants'] = grants
                 ret['changes']['current_grants'] = diff["current_grants"]
 
-                if not __opts__["test"]: 
+                if not __opts__["test"]:
                     # clean grants
                     result = velocmd(server_config, ["acl", "grant", username, "{}"])
                     if result.returncode != 0:
                         log.error("error while cleaning grants")
                         ret['result'] = False
-                        ret['comment'] = f"error while cleaning grants"    
+                        ret['comment'] = f"error while cleaning grants"
                         return ret
 
                     # adapt to format required by velociraptor tool

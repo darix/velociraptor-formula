@@ -118,7 +118,7 @@ def run():
     if not(parsed_config and "Client" in parsed_config and "ca_certificate" in parsed_config["Client"]):
       parsed_config= yaml.load(generate_new_config(), Loader=yaml.Loader)
 
-    package_list = ['velociraptor']
+    package_list = ['velociraptor', 'python311-pyvelociraptor']
 
     if use_humio:
       package_list.append('velociraptor-kafka-humio-gateway')
@@ -215,6 +215,17 @@ def run():
         ]
       }
 
+    for subdir in ['acls', 'clients', 'config', 'users']:
+      config[f"velociraptor_ensure_data_subdir_{subdir}"] = {
+        "file.directory": [
+          { "name":    f"/var/lib/velociraptor/data/{subdir}" },
+          { "user":    "velociraptor"},
+          { "group":   "velociraptor"},
+          { "mode":    "0700" },
+          { "require_in": ["velociraptor_merge_settings"] },
+        ]
+      }
+
     config["velociraptor_server_service"] = {
       "service.running": [
         { "name":    "velociraptor.service" },
@@ -260,7 +271,7 @@ def run():
           { "require": ["velociraptor_client_config"]},
         ]
       }
- 
+
     config["velo_api_user"] = {
       "velociraptor.create_api_user": [
           {"require": ["velociraptor_server_service"] },
