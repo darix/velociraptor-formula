@@ -99,6 +99,7 @@ def run():
 
   velociraptor_server_config = "/etc/velociraptor/server.config"
   velociraptor_client_config = "/etc/velociraptor/client.config"
+  velociraptor_api_client_config = "/etc/velociraptor/api.config"
 
   if "velociraptor" in __pillar__ and "server" in __pillar__["velociraptor"] and "client" in __pillar__["velociraptor"]:
 
@@ -259,6 +260,21 @@ def run():
           { "require": ["velociraptor_client_config"]},
         ]
       }
+ 
+    config["velo_api_user"] = {
+      "velociraptor.create_api_user": [
+          {"require": ["velociraptor_server_service"] },
+          {"server_config": velociraptor_server_config},
+          {"api_config": velociraptor_api_client_config}
+       ]
+    }
 
+    if "artifacts" in velociraptor_server_pillar:
+      config["velo_artifacts"] = {
+        "velociraptor.artifacts_configured": [
+          {"require": ["velociraptor_server_service",  "velo_api_user"] },
+          {"_apiconfig": velociraptor_api_client_config},
+        ]
+      }
 
   return config
