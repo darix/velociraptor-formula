@@ -368,77 +368,75 @@ def create_api_user (name, server_config, api_config):
     except KeyError:
         raise SaltConfigurationError("users configuration missing in velociraptor server")
 
-    username = None
     for user, settings in users_settings.items():
-        if "role" in settings:
-            if settings['role'] == "api":
-                username = user
-                break
+        if "role" not in settings:
+            raise SaltConfigurationError("user has not role set in the pillar")
 
-    if username == None:
-        raise SaltConfigurationError("an user with role api is missing in users")
+        role = settings['role']
+        api_config_exists = os.path.exists(api_config)
+        user_exists = False
+        new_user = False
 
-    log.debug(f"pillar api user is <{username}>")
-    role = users_settings[username]['role']
-    grants = users_settings[username]['grants']
-    api_config_exists = os.path.exists(api_config)
-    user_exists = False
-    new_user = False
-
-    result = velocmd(server_config, ["user", "show", username])
-    if result.returncode == 0:
-        ret['result'] = True
-        ret['comment'] = f"user {username} already created; "
-        user_exists = True
-    else:
-        if "User not found" in result.stderr:
-            user_exists = False
-
-    if not user_exists or not api_config_exists:
-        if not __opts__["test"]:
-            # clean user files just in case of wrong permissions
-            if os.path.exists(users_config["aclpath"] + username + ".json.db"):
-                os.remove(users_config["userspath"] + username + ".db")
-            if os.path.exists(users_config["aclpath"] + username + ".json.db"):
-                os.remove(users_config["aclpath"] + username + ".json.db")
-
-            log.info(f"user {username} not yet exist or apiconfig does not exists, creating ...")
-            result = velocmd(server_config, ["config", "api_client", "--name", username, "--role", role, api_config])
-
-            if result.returncode != 0:
-                ret['result'] = False
-                ret['comment'] = f"error while creating user {username}"
-                return ret
-
-            new_user = True
-            ret['changes'] = {username: f"user {username} properly created with role {role}"}
-            log.info(f"user {username} properly created ...")
-
-    if not user_exists:
-        ret['comment'] = f"user {username} does not exist, it will be created; "
-        ret['changes']['add_user'] = True
-        log.info(f"user {username} does not exist, it will be created")
-
-    if not api_config_exists:
-        ret['comment'] += "apiconfig does not exists, it will be created; "
-        ret['changes']['add_apiconfig'] = True
-        log.info("apiconfig does not exists")
-
-    if (new_user or not api_config_exists):
-        diff = diff_grants(server_config, username, grants)
-        if diff["error"]:
-            log.error(f"error while diffing grants")
-            return ret
+        result = velocmd(server_config, ["user", "show", user])
+        if result.returncode == 0:
+            ret['result'] = True
+            user_exists = True
         else:
-            if diff["diff"]:
-                different_grants = True
-                ret['comment'] += f"different user grants"
-                ret['changes']['desired_grants'] = grants
-                ret['changes']['current_grants'] = diff["current_grants"]
+            if "User not found" in result.stderr:
+                log.info(f"user {user} does not exists")
+                user_exists = False
+                if __opts__["test"]:
+                    ret['changes'].setdefault(user, {})
+                    ret['changes'][user]['add_user'] = True
 
-                if not __opts__["test"]:
+        if not user_exists:
+            if not __opts__["test"]:
+                # clean user files just in case of wrong permissions
+                if os.path.exists(users_config["aclpath"] + user + ".json.db"):
+                    os.remove(users_config["userspath"] + user + ".db")
+                if os.path.exists(users_config["aclpath"] + user + ".json.db"):
+                    os.remove(users_config["aclpath"] + user + ".json.db")
+
+                if role == 'api' or not api_config_exists:
+                    log.info(f"user {user} not yet exist or apiconfig does not exists, creating ...")
+                    result = velocmd(server_config, ["config", "api_client", "--name", user, "--role", role, api_config])
+                else:
+                    if "password" not in settings:
+                        raise SaltConfigurationError("user password not set")
+                    
+                    password = settings["password"]
+                    log.info(f"user {user} not yet exist, creating ...")
+                    result = velocmd(server_config, ["user", "add", "--role", role, user, password])
+
+                if result.returncode != 0:
+                    ret['result'] = False
+                    ret['comment'] = f"error while creating user {user}"
+                    return ret
+
+                new_user = True
+                ret['changes'].setdefault(user, {})
+                ret['changes'][user]['role'] = role
+                log.info(f"user {user} properly created ...")
+
+        if role == 'api' and not api_config_exists:
+            ret['changes']['add_apiconfig'] = True
+            log.info("apiconfig does not exists")
+
+        if "grants" in settings and settings["grants"] and not __opts__["test"]:
+            grants = settings["grants"]
+            diff = diff_grants(server_config, user, grants)
+            if diff["error"]:
+                log.error(f"error while diffing grants")
+                return ret
+            else:
+                if diff["diff"]:
+                    different_grants = True
+                    ret['changes'].setdefault(user, {})
+                    ret['changes'][user]['desired_grants'] = grants
+                    ret['changes'][user]['current_grants'] = diff["current_grants"]
+
                     # clean grants
-                    result = velocmd(server_config, ["acl", "grant", username, "{}"])
+                    result = velocmd(server_config, ["acl", "grant", user, "{}"])
                     if result.returncode != 0:
                         log.error("error while cleaning grants")
                         ret['result'] = False
@@ -449,20 +447,19 @@ def create_api_user (name, server_config, api_config):
                     grants = {key: True for key in grants}
                     grants = json.dumps(grants)
 
-                    result = velocmd(server_config, ["acl", "grant", username, grants])
+                    result = velocmd(server_config, ["acl", "grant", user, grants])
 
                     if result.returncode != 0:
                         ret['result'] = False
-                        ret['comment'] = f"error while adding {grants} to user {username}"
+                        ret['comment'] = f"error while adding {grants} to user {user}"
                         return ret
 
-                    log.info(f"grants {grants} properly added")
-                    ret['result'] = True
-
-                    #fix permissions
-                    user_info = pwd.getpwnam(users_config["fileowner"])
-                    uid = user_info.pw_uid
-                    gid = user_info.pw_gid
-                    os.chown(users_config["userspath"] + username + ".db", uid, gid)
-                    os.chown(users_config["aclpath"] + username + ".json.db", uid, gid)
+                    log.info(f"grants {grants} properly added to user {user}")
+            if new_user:
+                #fix permissions
+                user_info = pwd.getpwnam(users_config["fileowner"])
+                uid = user_info.pw_uid
+                gid = user_info.pw_gid
+                os.chown(users_config["userspath"] + user + ".db", uid, gid)
+                os.chown(users_config["aclpath"] + user + ".json.db", uid, gid)
     return ret
