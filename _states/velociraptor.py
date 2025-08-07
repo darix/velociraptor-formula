@@ -362,11 +362,25 @@ def create_api_user (name, server_config, api_config):
 
     log.debug("VR-APIUSER")
 
-    user_settings = __pillar__["velociraptor"]["server"]["user"]
+    try:
+        users_settings = __pillar__["velociraptor"]["server"]["users"]
+        users_config = __pillar__["velociraptor"]["server"]["users_config"]
+    except KeyError:
+        raise SaltConfigurationError("users configuration missing in velociraptor server")
 
-    username = next(iter(user_settings))
-    role = user_settings[username]['role']
-    grants = user_settings[username]['grants']
+    username = None
+    for user, settings in users_settings.items():
+        if "role" in settings:
+            if settings['role'] == "api":
+                username = user
+                break
+
+    if username == None:
+        raise SaltConfigurationError("an user with role api is missing in users")
+
+    log.debug(f"pillar api user is <{username}>")
+    role = users_settings[username]['role']
+    grants = users_settings[username]['grants']
     api_config_exists = os.path.exists(api_config)
     user_exists = False
     new_user = False
@@ -383,10 +397,10 @@ def create_api_user (name, server_config, api_config):
     if not user_exists or not api_config_exists:
         if not __opts__["test"]:
             # clean user files just in case of wrong permissions
-            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
-                os.remove(user_settings["userspath"] + username + ".db")
-            if os.path.exists(user_settings["aclpath"] + username + ".json.db"):
-                os.remove(user_settings["aclpath"] + username + ".json.db")
+            if os.path.exists(users_config["aclpath"] + username + ".json.db"):
+                os.remove(users_config["userspath"] + username + ".db")
+            if os.path.exists(users_config["aclpath"] + username + ".json.db"):
+                os.remove(users_config["aclpath"] + username + ".json.db")
 
             log.info(f"user {username} not yet exist or apiconfig does not exists, creating ...")
             result = velocmd(server_config, ["config", "api_client", "--name", username, "--role", role, api_config])
@@ -446,9 +460,9 @@ def create_api_user (name, server_config, api_config):
                     ret['result'] = True
 
                     #fix permissions
-                    user_info = pwd.getpwnam(user_settings["fileowner"])
+                    user_info = pwd.getpwnam(users_config["fileowner"])
                     uid = user_info.pw_uid
                     gid = user_info.pw_gid
-                    os.chown(user_settings["userspath"] + username + ".db", uid, gid)
-                    os.chown(user_settings["aclpath"] + username + ".json.db", uid, gid)
+                    os.chown(users_config["userspath"] + username + ".db", uid, gid)
+                    os.chown(users_config["aclpath"] + username + ".json.db", uid, gid)
     return ret
