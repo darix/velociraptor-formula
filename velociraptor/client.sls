@@ -108,7 +108,7 @@ def run():
       package_list.append(f"velociraptor-apparmor-client-{apparmor_profile}")
 
     config["velociraptor_packages"] = {
-      "pkg.installed": [
+      "pkg.latest": [
         { "names": package_list }
       ]
     }
