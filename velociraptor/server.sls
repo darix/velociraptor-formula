@@ -143,7 +143,7 @@ def run():
         package_list.append('velociraptor-apparmor-kafka-humio-gateway')
 
     config["velociraptor_packages"] = {
-      "pkg.installed": [
+      "pkg.latest": [
         { "names": package_list },
       ]
     }
