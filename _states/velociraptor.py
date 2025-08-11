@@ -455,11 +455,12 @@ def create_api_user (name, server_config, api_config):
                         return ret
 
                     log.info(f"grants {grants} properly added to user {user}")
-            if new_user:
-                #fix permissions
-                user_info = pwd.getpwnam(users_config["fileowner"])
-                uid = user_info.pw_uid
-                gid = user_info.pw_gid
-                os.chown(users_config["userspath"] + user + ".db", uid, gid)
-                os.chown(users_config["aclpath"] + user + ".json.db", uid, gid)
+
+        if new_user:
+            #fix permissions
+            user_info = pwd.getpwnam(users_config["fileowner"])
+            uid = user_info.pw_uid
+            gid = user_info.pw_gid
+            os.chown(users_config["userspath"] + user + ".db", uid, gid)
+            os.chown(users_config["aclpath"] + user + ".json.db", uid, gid)
     return ret
