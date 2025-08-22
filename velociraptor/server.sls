@@ -254,6 +254,7 @@ def run():
         "service.running": [
           { "name":    "velociraptor-auto-rotate-keys.timer" },
           { "enable":  "True" },
+          { "require": [ "velociraptor_server_service" ] },
         ]
       }
 
