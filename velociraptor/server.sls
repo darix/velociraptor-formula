@@ -107,6 +107,7 @@ def run():
     velociraptor_client_pillar = __pillar__["velociraptor"]["client"]
 
     use_apparmor        = __pillar__["velociraptor"].get('use_apparmor', False)
+    use_auto_key_rotate = __pillar__["velociraptor"].get('use_automatic_key_rotation', False)
     server_self_monitor = __pillar__["velociraptor"].get('server_self_monitor', False)
     use_humio    = ( "humio_gateway" in velociraptor_client_pillar and velociraptor_client_pillar["humio_gateway"] )
 
@@ -122,6 +123,9 @@ def run():
 
     if use_humio:
       package_list.append('velociraptor-kafka-humio-gateway')
+
+    if use_auto_key_rotate:
+      package_list.append('velociraptor-auto-rotate-keys')
 
     if use_apparmor:
       package_list.append("velociraptor-apparmor-server")
@@ -244,6 +248,14 @@ def run():
 
       ]
     }
+
+    if use_auto_key_rotate:
+      config["velociraptor_automatic_key_rotation_timer"] = {
+        "service.running": [
+          { "name":    "velociraptor-auto-rotate-keys.timer" },
+          { "enable":  "True" },
+        ]
+      }
 
     if server_self_monitor:
       config["velociraptor_client_config"] = {

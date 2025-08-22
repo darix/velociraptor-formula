@@ -31,6 +31,8 @@ mine_functions:
 velociraptor:
   # disabled by default
   use_apparmor: False
+  # disabled by default. requires velociraptor-auto-rotate-keys package
+  use_automatic_key_rotation: False
   # used for accessing salt mine
   server_address: velociraptor.example.com
   server_self_monitor: True
