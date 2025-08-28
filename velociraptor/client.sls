@@ -101,6 +101,7 @@ def run():
     package_list = ['velociraptor-client']
 
     if use_apparmor:
+      package_list.append(f"velociraptor-apparmor")
       if "apparmor_profile" in velociraptor_client_pillar:
         apparmor_profile = velociraptor_client_pillar["apparmor_profile"]
       else:
