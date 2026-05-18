@@ -26,10 +26,10 @@ file_roots:
 
 ## cfgmgmt-template integration
 
-if you are using our [cfgmgmt-template](https://github.com/darix/cfgmgmt-template) as a starting point the saltmaster you can simplify the setup with:
+if you are using our [cfgmgmt-template](https://codeberg.org/salted-geeko/cfgmgmt-template) as a starting point the saltmaster you can simplify the setup with:
 
 ```
-git submodule add https://github.com/darix/velociraptor-formula formulas/velociraptor-formula
+git submodule add https://codeberg.org/salted-geeko/velociraptor-formula formulas/velociraptor-formula
 ln -s /srv/cfgmgmt/formulas/velociraptor-formula/config/enable_velociraptor.conf /etc/salt/master.d/
 systemctl restart saltmaster
 ```
