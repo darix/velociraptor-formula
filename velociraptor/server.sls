@@ -119,7 +119,9 @@ def run():
     if not(parsed_config and "Client" in parsed_config and "ca_certificate" in parsed_config["Client"]):
       parsed_config= yaml.load(generate_new_config(), Loader=yaml.Loader)
 
-    package_list = ['velociraptor', 'python311-pyvelociraptor']
+    py_ver = __salt__['grains.get']('pythonversion', [])
+    py_package = f'python{py_ver[0]}{py_ver[1]}'
+    package_list = ['velociraptor', f'{py_package}-pyvelociraptor'] # , f'{py_package}-grpcio']
 
     if use_humio:
       package_list.append('velociraptor-kafka-humio-gateway')
