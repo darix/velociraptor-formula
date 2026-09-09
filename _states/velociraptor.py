@@ -12,6 +12,8 @@ import pwd
 from salt.exceptions import SaltConfigurationError, SaltRenderError
 import salt.utils.yamlloader as suyl
 import cryptography
+from cryptography import x509
+import datetime
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ def is_expired(api_config):
   else:
     return True
 
-def ensure_working_api_config(user, role, api_config):
+def ensure_working_api_config(server_config, user, role, api_config):
   if is_expired(api_config):
     result = velocmd(server_config, ["config", "api_client", "--name", user, "--role", role, api_config])
 
@@ -417,7 +419,7 @@ def create_api_user (name, server_config, api_config):
                 else:
                     if "password" not in settings:
                         raise SaltConfigurationError("user password not set")
-                    
+
                     password = settings["password"]
                     log.info(f"user {user} not yet exist, creating ...")
                     result = velocmd(server_config, ["user", "add", "--role", role, user, password])
@@ -432,7 +434,7 @@ def create_api_user (name, server_config, api_config):
                 ret['changes'][user]['role'] = role
                 log.info(f"user {user} properly created ...")
         else:
-          ensure_working_api_config(user, role, api_config)
+          ensure_working_api_config(server_config, user, role, api_config)
 
         if role == 'api' and not api_config_exists:
             ret['changes']['add_apiconfig'] = True
