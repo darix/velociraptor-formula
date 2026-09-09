@@ -10,6 +10,8 @@ import subprocess
 import os
 import pwd
 from salt.exceptions import SaltConfigurationError, SaltRenderError
+import salt.utils.yamlloader as suyl
+import cryptography
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +24,18 @@ class DiffStatus(Enum):
     ERROR = 2
 
 apiconfig = ""
+
+def is_expired(api_config):
+  if os.path.exists(api_config):
+    doc = suyl.load(open(api_config).read())
+    cert = x509.load_pem_x509_certificate(bytes(doc['client_cert'], encoding='UTF-8'))
+    return cert.not_valid_after_utc.utctimetuple() < datetime.datetime.utcnow().utctimetuple()
+  else:
+    return True
+
+def ensure_working_api_config(user, role, api_config):
+  if is_expired(api_config):
+    result = velocmd(server_config, ["config", "api_client", "--name", user, "--role", role, api_config])
 
 def get_velo_server_artifacts ():
     out = run_velo_query('SELECT get_server_monitoring() FROM scope()')
@@ -417,6 +431,8 @@ def create_api_user (name, server_config, api_config):
                 ret['changes'].setdefault(user, {})
                 ret['changes'][user]['role'] = role
                 log.info(f"user {user} properly created ...")
+        else:
+          ensure_working_api_config(user, role, api_config)
 
         if role == 'api' and not api_config_exists:
             ret['changes']['add_apiconfig'] = True
